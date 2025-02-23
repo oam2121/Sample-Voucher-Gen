@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Voucher Receipt (Landscape with Header & Footer)</title>
+
+  <!-- Include html2canvas (for some jsPDF features) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <!-- Include jsPDF (v2.5.1 or later) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <!-- Include jsPDF-AutoTable plugin -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f8f9fa;
+      display: flex;
+      justify-content: center;
+      padding: 20px;
+      margin: 0;
+    }
+    .container {
+      background: #fff;
+      padding: 25px;
+      border-radius: 10px;
+      width: 450px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    }
+    h2 {
+      text-align: center;
+      color: #333;
+    }
+    label {
+      font-weight: bold;
+      display: block;
+      margin-bottom: 5px;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 15px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      box-sizing: border-box;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      background: #28a745;
+      color: #fff;
+      border: none;
+      font-size: 16px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #218838;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Voucher Receipt</h2>
+
+    <label for="voucherType">Voucher Type:</label>
+    <select id="voucherType">
+      <option value="Car Driver">Car Driver</option>
+      <option value="Petrol">Petrol</option>
+    </select>
+
+    <label for="name">Name:</label>
+    <input type="text" id="name" placeholder="Enter name">
+
+    <label for="date">Date:</label>
+    <input type="date" id="date">
+
+    <label for="amount">Amount (in INR):</label>
+    <input type="number" id="amount" placeholder="Enter amount">
+
+    <label for="description">Description:</label>
+    <textarea id="description" placeholder="Enter description"></textarea>
+
+    <button onclick="generateVoucher()">Generate &amp; Download Voucher</button>
+  </div>
+
+  <script>
+    function generateVoucher() {
+      const voucherType = document.getElementById("voucherType").value;
+      const name = document.getElementById("name").value;
+      const date = document.getElementById("date").value;
+      const amount = document.getElementById("amount").value;
+      const description = document.getElementById("description").value;
+
+      if (!voucherType || !name || !date || !amount || !description) {
+        alert("Please fill all fields");
+        return;
+      }
+
+      // Format the amount (using Rs. if the rupee symbol causes issues)
+      const numericAmount = parseFloat(amount);
+      const formattedAmount = isNaN(numericAmount)
+        ? ""
+        : numericAmount.toLocaleString("en-IN", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+          });
+      
+      // Generate a random voucher number
+      const voucherNo = "VCH" + Math.floor(Math.random() * 100000);
+
+      // Create the PDF in landscape orientation with header and footer
+      createProfessionalPDF({
+        voucherNo,
+        date,
+        voucherType,
+        name,
+        amount: formattedAmount,
+        numericAmount,
+        description
+      });
+    }
+
+    // A simple number-to-words conversion function (supports up to billions)
+    function convertNumberToWords(num) {
+      if (num === 0) return "zero";
+      
+      const a = [
+        "", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
+        "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen",
+        "eighteen", "nineteen"
+      ];
+      const b = [
+        "", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"
+      ];
+      const g = [
+        "", "thousand", "million", "billion"
+      ];
+  
+      const makeGroup = ([ones, tens, huns]) => {
+        let str = "";
+        if (huns) {
+          str += a[huns] + " hundred ";
+        }
+        if (tens === 1) {
+          str += a[10 + ones] + " ";
+        } else {
+          if (tens > 1) {
+            str += b[tens] + " ";
+          }
+          if (ones) {
+            str += a[ones] + " ";
+          }
+        }
+        return str.trim();
+      };
+  
+      // Split number into groups of 3 digits
+      const numStr = ("000000000" + num).slice(-9);
+      const groups = [
+        parseInt(numStr.slice(0, 3), 10),
+        parseInt(numStr.slice(3, 6), 10),
+        parseInt(numStr.slice(6, 9), 10)
+      ];
+      let words = "";
+      for (let i = 0; i < groups.length; i++) {
+        if (groups[i] !== 0) {
+          words += makeGroup([
+            groups[i] % 10,
+            Math.floor(groups[i] / 10) % 10,
+            Math.floor(groups[i] / 100)
+          ]) + " " + g[groups.length - i - 1] + " ";
+        }
+      }
+      return words.trim();
+    }
+
+    function createProfessionalPDF({ voucherNo, date, voucherType, name, amount, numericAmount, description }) {
+      const { jsPDF } = window.jspdf;
+      // Create landscape A4: width ~842pt, height ~595pt (approximate)
+      const doc = new jsPDF("l", "pt", "A4");
+
+      // Define header and footer heights and margins
+      const headerHeight = 50;
+      const footerHeight = 40;
+      const margin = 20;
+
+      // Draw header background (a professional colored box)
+      doc.setFillColor(30, 144, 255); // DodgerBlue
+      doc.rect(margin, margin, 802, headerHeight, 'F');
+      // Header text: "Voucher Receipt"
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(18);
+      doc.setTextColor(255, 255, 255);
+      doc.text("Voucher Receipt", doc.internal.pageSize.getWidth() / 2, margin + headerHeight / 2 + 6, { align: "center" });
+
+      // Draw footer background for a professional look (no extra text)
+      const pageHeight = doc.internal.pageSize.getHeight();
+      doc.setFillColor(211, 211, 211); // LightGray
+      doc.rect(margin, pageHeight - footerHeight - margin, 802, footerHeight, 'F');
+
+      // Draw an outer border for the main content area
+      doc.setLineWidth(1);
+      doc.setDrawColor(0, 0, 0);
+      // Main content area starts after header and ends before footer
+      const contentY = margin + headerHeight + 10;
+      const contentHeight = pageHeight - headerHeight - footerHeight - 2 * margin - 10;
+      doc.rect(margin, contentY, 802, contentHeight);
+
+      // Prepare table data for voucher details, including Amount in Words
+      const tableBody = [
+        ["Voucher No:", voucherNo],
+        ["Date:", date],
+        ["Voucher Type:", voucherType],
+        ["Name:", name],
+        ["Amount (Rs.):", amount],
+        ["Amount in Words:", convertNumberToWords(numericAmount)],
+        ["Description:", description]
+      ];
+
+      // Generate table using AutoTable, ensuring it starts below the header area within the content
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(12);
+      doc.autoTable({
+        startY: contentY + 10,
+        theme: "grid",
+        head: [],
+        body: tableBody,
+        styles: { cellPadding: 8, fontSize: 12 },
+        columnStyles: {
+          0: { cellWidth: 150, fontStyle: "bold", halign: "right" },
+          1: { cellWidth: 500, halign: "left" }
+        },
+        tableLineColor: 200,
+        tableLineWidth: 0.5
+      });
+
+      // Add signature lines below the table
+      const finalY = doc.autoTable.previous.finalY + 50;
+      doc.setLineWidth(0.5);
+      // Left signature line: Receiver
+      doc.line(80, finalY, 280, finalY);
+      doc.text("Receiver's Signature", 180, finalY + 15, { align: "center" });
+      // Right signature line: Giver
+      doc.line(480, finalY, 680, finalY);
+      doc.text("Giver's Signature", 580, finalY + 15, { align: "center" });
+
+      // Save the PDF file
+      doc.save("Voucher_Receipt_Landscape.pdf");
+    }
+  </script>
+</body>
+</html>
